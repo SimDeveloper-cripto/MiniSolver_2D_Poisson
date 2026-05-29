@@ -1,19 +1,23 @@
 /**
  * gpu_solver.h
  * ─────────────────────────────────────────────────────────────────────────────
- * GPU Jacobi kernels and host-side solver wrappers.
+ * GPU Jacobi kernels and Host-Side Solver wrappers.
  *
  * Two kernel variants are provided:
  *
  *   V1 – jacobi_kernel_naive
- *        One thread per grid point; all reads/writes go to global memory.
- *        Convergence check (Strategy A): every check_every iterations the
- *        two grids are copied to the host and the error is computed on CPU.
+ *        - One thread per grid point
+ *        - All reads/writes go to global memory
+ *        - Convergence check (Strategy A)
+ *            - Every "check_every" iterations the two grids are copied to the
+ *              host and the error is computed on CPU.
  *
  *   V2 – jacobi_kernel_shared
- *        Shared-memory tile with 1-cell halo; convergence check embedded
- *        (Strategy B): each block computes its local max-diff and writes it
- *        to d_block_max; the host reads the array every check_every iters.
+ *        - Shared-memory Tile with 1-cell Halo
+ *        - Convergence check (Strategy B)
+ *            - Each block computes its local max-diff and writes it
+ *              to d_block_max
+ *            - The host reads the array every "check_every" iterations.
  *
  * CUDA design notes
  * ─────────────────
@@ -28,29 +32,31 @@
 
 #pragma once
 
-#include <cuda_runtime.h>
 #include "common.h"
+#include <cuda_runtime.h>
 
-// ── Kernel declarations ───────────────────────────────────────────────────────
+// ── Kernel declarations
 
 /**
- * V1 – Naïve Jacobi kernel (global memory only).
+ * V1
  *
- * Each thread (tx, ty) processes grid point (i = blockIdx.y*TILE_Y+ty,
- * j = blockIdx.x*TILE_X+tx).  Interior-only guard skips boundary threads.
+ * Each thread (tx, ty) processes grid point
+ * i = blockIdx.y * TILE_Y + ty,
+ * j = blockIdx.x* T ILE_X + tx.
  */
 __global__ void jacobi_kernel_naive(
     double* __restrict__       u_new,
     const double* __restrict__ u,
     const double* __restrict__ f,
     int    N,
-    double h2);
+    double h2
+);
 
 /**
  * V2 – Optimised Jacobi kernel (shared memory + embedded max reduction).
  *
  * Shared memory layout:
- *   s_u   [SMEM_Y][SMEM_X]  – tile of u with 1-cell halo (SMEM_* = TILE_*+2)
+ *   s_u   [SMEM_Y][SMEM_X]  – tile of u with 1-cell halo (SMEM_* = TILE_* + 2)
  *   s_max [TILE_Y * TILE_X] – per-thread partial max for block reduction
  *
  * After __syncthreads() the Jacobi update reads exclusively from s_u,
@@ -65,7 +71,8 @@ __global__ void jacobi_kernel_shared(
     const double* __restrict__ f,
     int    N,
     double h2,
-    double* __restrict__       d_block_max);
+    double* __restrict__       d_block_max
+);
 
 /**
  * V3 – Super-optimised Jacobi kernel (linear, coalesced shared-memory loader + embedded max reduction).
@@ -114,11 +121,11 @@ SolverResult jacobi_gpu_coalesced(
     const double* d_f);
 
 /**
- * Pure-throughput benchmark: runs exactly bench_iters iterations of the
- * chosen kernel without any convergence check or H↔D transfer.
- * Returns milliseconds for bench_iters iterations (measured with CUDA events).
+ * Tthroughput Benchmark: runs exactly bench_iters iterations of the
+ * chosen kernel without any convergence check or H ↔ D transfer.
+ * Returns milliseconds.
  *
- * @param use_shared  0 → V1 kernel; 1 → V2 kernel; 2 → V3 kernel.
+ * @param use_shared 
  */
 float jacobi_gpu_benchmark(
     SolverParams  params,
@@ -126,5 +133,4 @@ float jacobi_gpu_benchmark(
     double*       d_u_new,
     const double* d_f,
     int           bench_iters,
-    int           version);
-
+    int           version);    // 0 → V1 kernel; 1 → V2 kernel; 2 → V3 kernel

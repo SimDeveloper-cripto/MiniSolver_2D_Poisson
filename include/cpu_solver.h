@@ -12,7 +12,7 @@
  *   u_new[i,j] = 0.25 * (u[i-1,j] + u[i+1,j] + u[i,j-1] + u[i,j+1]
  *                         + h² · f[i,j])
  *
- * All arrays are flat, row-major:  element (i,j) is at index (i*j + N).
+ * All arrays are flat, row-major:  element (i,j) is at index (i*N + j).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 

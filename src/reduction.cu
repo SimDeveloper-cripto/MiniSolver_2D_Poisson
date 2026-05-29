@@ -21,13 +21,13 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-#include <cuda_runtime.h>
 #include <cfloat>
+#include <cuda_runtime.h>
 
 #include "../include/reduction.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Device helper: reduce 32 values within one warp using shuffle intrinsics.
+// Device helper
 // No __syncthreads() needed — all threads belong to the same warp.
 // ─────────────────────────────────────────────────────────────────────────────
 __device__ __forceinline__
@@ -52,24 +52,24 @@ double warpReduceMax(double val)
 __global__ void reduce_max_kernel(
     const double* __restrict__ input,
     double* __restrict__       output,
-    int n)
-{
+    int n
+) {
     extern __shared__ double sdata[];
 
     const int tid = threadIdx.x;
 
-    // ── Grid-stride load: each thread handles two consecutive elements ────────
+    // ── Grid-stride load: each thread handles two consecutive elements
     // This halves the number of blocks needed and keeps threads busy longer.
     int i = (int)(blockIdx.x * (blockDim.x * 2) + tid);
     double myMax = -DBL_MAX;
 
-    if (i          < n) myMax = input[i];
+    if (i < n) myMax = input[i];
     if (i + blockDim.x < n) myMax = fmax(myMax, input[i + blockDim.x]);
 
     sdata[tid] = myMax;
     __syncthreads();
 
-    // ── Binary-tree reduction (shared memory) — strides > warp size ──────────
+    // ── Binary-tree reduction (shared memory) — strides > warp size
     for (int s = blockDim.x / 2; s > 32; s >>= 1) {
         if (tid < s) {
             sdata[tid] = fmax(sdata[tid], sdata[tid + s]);
@@ -77,12 +77,13 @@ __global__ void reduce_max_kernel(
         __syncthreads();
     }
 
-    // ── Warp-level reduction — no __syncthreads() needed ─────────────────────
-    // After the loop above, sdata[0..63] have partial results.
+    // ── Warp-level reduction — no __syncthreads() needed
+    // After the loop above, sdata[0 .. 63] have partial results.
     // Threads 0-31 pick up the values from 32-63 and reduce within the warp.
     if (tid < 32) {
         // Bring in the second half of the remaining 64 elements.
         double v = fmax(sdata[tid], sdata[tid + 32]);
+
         // Warp shuffle reduction (no shared-memory write needed).
         v = warpReduceMax(v);
         if (tid == 0) output[blockIdx.x] = v;
@@ -92,11 +93,11 @@ __global__ void reduce_max_kernel(
 // ─────────────────────────────────────────────────────────────────────────────
 // Host wrapper
 // ─────────────────────────────────────────────────────────────────────────────
-double reduce_max_gpu(const double* d_data, int n)
-{
+double reduce_max_gpu(const double* d_data, int n) {
     if (n <= 0) return 0.0;
 
     const int threads = 256;   // must be a power of 2 and >= 64
+
     // Each block covers 2 × threads elements (grid-stride load).
     const int blocks  = (n + threads * 2 - 1) / (threads * 2);
 
@@ -104,8 +105,7 @@ double reduce_max_gpu(const double* d_data, int n)
     CUDA_CHECK(cudaMalloc(&d_partial, (size_t)blocks * sizeof(double)));
 
     // Phase 1: reduce n elements → blocks partial maxima.
-    reduce_max_kernel<<<blocks, threads, (size_t)threads * sizeof(double)>>>(
-        d_data, d_partial, n);
+    reduce_max_kernel<<<blocks, threads, (size_t)threads * sizeof(double)>>>(d_data, d_partial, n);
     CUDA_CHECK(cudaGetLastError());
 
     double result = 0.0;
@@ -115,19 +115,16 @@ double reduce_max_gpu(const double* d_data, int n)
         double* d_final = nullptr;
         CUDA_CHECK(cudaMalloc(&d_final, sizeof(double)));
 
-        reduce_max_kernel<<<1, threads, (size_t)threads * sizeof(double)>>>(
-            d_partial, d_final, blocks);
+        reduce_max_kernel<<<1, threads, (size_t)threads * sizeof(double)>>>(d_partial, d_final, blocks);
         CUDA_CHECK(cudaGetLastError());
         CUDA_CHECK(cudaDeviceSynchronize());
 
-        CUDA_CHECK(cudaMemcpy(&result, d_final,
-                              sizeof(double), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(&result, d_final, sizeof(double), cudaMemcpyDeviceToHost));
         CUDA_CHECK(cudaFree(d_final));
     } else {
         // Only one block: result is already in d_partial[0].
         CUDA_CHECK(cudaDeviceSynchronize());
-        CUDA_CHECK(cudaMemcpy(&result, d_partial,
-                              sizeof(double), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(&result, d_partial, sizeof(double), cudaMemcpyDeviceToHost));
     }
 
     CUDA_CHECK(cudaFree(d_partial));

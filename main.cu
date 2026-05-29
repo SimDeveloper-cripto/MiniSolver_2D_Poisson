@@ -1,3 +1,12 @@
+// Compile:
+// !nvcc -O3 -arch=sm_75 -use_fast_math -Iinclude src/cpu_solver.cpp src/gpu_solver.cu src/reduction.cu src/validation.cpp main.cu -o minisolver
+
+// Execute (need to set parameters):
+// !./minisolver --n 256 --tol 1e-7
+
+// TODO:
+// Refactor main.cu []
+
 #include <cmath>
 #include <vector>
 #include <string>
@@ -38,17 +47,8 @@ void print_gpu_properties() {
     printf("=========================================================\n\n");
 }
 
-
-
-
-
-
-
-
-
-// ── Test & validate the standalone parallel reduction ──────────────────────
-void test_standalone_reduction()
-{
+// ── Test & Validate the Standalone Parallel Reduction
+void test_standalone_reduction() {
     printf("--- Running Standalone GPU Max-Reduction Test ---\n");
     const int M = 2500000; // 2.5 Million elements
     std::vector<double> h_test(M);
@@ -61,17 +61,17 @@ void test_standalone_reduction()
     }
 
     // Force a known maximum at a random index
-    const int special_idx = rand() % M;
+    const int special_idx    = rand() % M;
     const double special_val = 9999.87654;
-    h_test[special_idx] = special_val;
+    h_test[special_idx]      = special_val;
     if (special_val > cpu_max) cpu_max = special_val;
 
-    // Allocate and copy to GPU
+    // Allocate and Copy to GPU
     double* d_test = nullptr;
     CUDA_CHECK(cudaMalloc(&d_test, M * sizeof(double)));
     CUDA_CHECK(cudaMemcpy(d_test, h_test.data(), M * sizeof(double), cudaMemcpyHostToDevice));
 
-    // Run GPU reduction
+    // Run GPU Reduction
     CpuTimer timer;
     timer.start();
     double gpu_max = reduce_max_gpu(d_test, M);
@@ -80,7 +80,7 @@ void test_standalone_reduction()
     CUDA_CHECK(cudaFree(d_test));
 
     const double diff = std::fabs(cpu_max - gpu_max);
-    const bool pass = (diff < 1e-9);
+    const bool pass   = (diff < 1e-9);
 
     printf("  Vector Size : %d elements (%.2f MB)\n", M, (double)(M * sizeof(double)) / (1024.0 * 1024.0));
     printf("  CPU Max     : %.5f\n", cpu_max);
@@ -90,8 +90,7 @@ void test_standalone_reduction()
     printf("  Result      : %s\n\n", pass ? "[ PASS ]" : "[ FAIL ]");
 }
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
     // Default Solver Params
     int N                = 256;
     double tol           = 1.0e-7;
@@ -144,10 +143,9 @@ int main(int argc, char** argv)
     }
 
     double h = 1.0 / (N - 1);
-    SolverParams params = { N, h, tol, max_iter, check_every }; // :)
+    SolverParams params = { N, h, tol, max_iter, check_every };
 
     print_gpu_properties();
-
 
     test_standalone_reduction();
 
@@ -172,13 +170,15 @@ int main(int argc, char** argv)
 
     // Initialize source term and boundaries
     initialize(h_u_cpu, h_f, N, h);
-    std::memcpy(h_u_new, h_u_cpu, bytes);
+    std::memcpy(h_u_new,    h_u_cpu, bytes);
     std::memcpy(h_u_gpu_v1, h_u_cpu, bytes);
     std::memcpy(h_u_gpu_v2, h_u_cpu, bytes);
     std::memcpy(h_u_gpu_v3, h_u_cpu, bytes);
 
     // Device memory allocation
-    double *d_u = nullptr, *d_u_new = nullptr, *d_f = nullptr;
+    double *d_u     = nullptr;
+    double *d_u_new = nullptr;
+    double*d_f      = nullptr;
     CUDA_CHECK(cudaMalloc(&d_u, bytes));
     CUDA_CHECK(cudaMalloc(&d_u_new, bytes));
     CUDA_CHECK(cudaMalloc(&d_f, bytes));
@@ -209,9 +209,9 @@ int main(int argc, char** argv)
 
     // ── 2. GPU Naive (V1) Solve ──────────────────────────────────────────────
     printf("Running GPU Naive (V1) Solver (Strategy A: H<->D copying)...\n");
-    CUDA_CHECK(cudaMemcpy(d_u, h_u_gpu_v1, bytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_u, h_u_gpu_v1,     bytes, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_u_new, h_u_gpu_v1, bytes, cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_f, h_f, bytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_f, h_f,            bytes, cudaMemcpyHostToDevice));
 
     SolverResult v1_res = jacobi_gpu_naive(params, d_u, d_u_new, d_f);
 
@@ -223,7 +223,7 @@ int main(int argc, char** argv)
 
     // ── 3. GPU Optimized (V2) Solve ──────────────────────────────────────────
     printf("Running GPU Optimized (V2) Solver (Strategy B: Shared Memory + Block Reduction)...\n");
-    CUDA_CHECK(cudaMemcpy(d_u, h_u_gpu_v2, bytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_u, h_u_gpu_v2,     bytes, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_u_new, h_u_gpu_v2, bytes, cudaMemcpyHostToDevice));
 
     SolverResult v2_res = jacobi_gpu_optimized(params, d_u, d_u_new, d_f);
@@ -246,6 +246,7 @@ int main(int argc, char** argv)
 
     printf("  GPU V3: %d iterations in %.2f ms (%.4f ms/iter). Final err: %.6e\n\n",
            v3_res.iters, v3_res.total_ms, v3_res.ms_per_iter, v3_res.final_error);
+
 
     // ── 4. Validation ────────────────────────────────────────────────────────
     printf("=========================================================\n");
@@ -308,7 +309,7 @@ int main(int argc, char** argv)
             CUDA_CHECK(cudaMemcpy(db_u_new, hb_u, bbytes, cudaMemcpyHostToDevice));
             CUDA_CHECK(cudaMemcpy(db_f, hb_f, bbytes, cudaMemcpyHostToDevice));
 
-            // CPU Benchmark (skip or do fewer iterations for N=1024 to save time, say 100 and scale)
+            // CPU Benchmark (skip or do fewer iterations for N = 1024 to save time, say 100 and scale)
             double cpu_t_ms = 0.0;
             if (run_cpu) {
                 int cpu_bench_iters = (bn <= 256) ? bench_iters : 100;
@@ -317,14 +318,16 @@ int main(int argc, char** argv)
 
                 CpuTimer cpu_timer;
                 cpu_timer.start();
-                double* u_ptr = hb_u;
+
+                double* u_ptr  = hb_u;
                 double* un_ptr = hb_u_new;
-                double bh2 = bh * bh;
+                double bh2     = bh * bh;
                 for (int it = 0; it < cpu_bench_iters; ++it) {
                     jacobi_step_cpu(un_ptr, u_ptr, hb_f, bn, bh2);
+
                     double* tmp = un_ptr;
-                    un_ptr = u_ptr;
-                    u_ptr = tmp;
+                    un_ptr      = u_ptr;
+                    u_ptr       = tmp;
                 }
                 cpu_timer.stop();
                 cpu_t_ms = cpu_timer.elapsed_ms() * ((double)bench_iters / cpu_bench_iters);
@@ -332,36 +335,36 @@ int main(int argc, char** argv)
                 free(hb_u_new);
 
                 double cpu_mupdates = (double)(bn - 2) * (bn - 2) * bench_iters / (cpu_t_ms * 1000.0);
-                double cpu_gb = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (cpu_t_ms * 1.0e6);
+                double cpu_gb       = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (cpu_t_ms * 1.0e6);
                 printf("%-5d | %-12s | %12.2f | %12.2f | %12.2f | %-8s\n",
                        bn, "CPU", cpu_t_ms, cpu_mupdates, cpu_gb, "1.00x (Ref)");
             }
 
             // GPU Naive (V1)
-            float v1_t_ms = jacobi_gpu_benchmark({bn, bh, 0.0, 0, 0}, db_u, db_u_new, db_f, bench_iters, 0);
+            float v1_t_ms      = jacobi_gpu_benchmark({bn, bh, 0.0, 0, 0}, db_u, db_u_new, db_f, bench_iters, 0);
             double v1_mupdates = (double)(bn - 2) * (bn - 2) * bench_iters / (v1_t_ms * 1000.0);
-            double v1_gb = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (v1_t_ms * 1.0e6);
-            double v1_speedup = (run_cpu) ? (cpu_t_ms / v1_t_ms) : 1.0;
+            double v1_gb       = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (v1_t_ms * 1.0e6);
+            double v1_speedup  = (run_cpu) ? (cpu_t_ms / v1_t_ms) : 1.0;
 
             printf("%-5d | %-12s | %12.2f | %12.2f | %12.2f | %7.2fx\n",
                    bn, "GPU V1 Naive", (double)v1_t_ms, v1_mupdates, v1_gb, v1_speedup);
 
             // GPU Optimized (V2)
-            float v2_t_ms = jacobi_gpu_benchmark({bn, bh, 0.0, 0, 0}, db_u, db_u_new, db_f, bench_iters, 1);
+            float v2_t_ms      = jacobi_gpu_benchmark({bn, bh, 0.0, 0, 0}, db_u, db_u_new, db_f, bench_iters, 1);
             double v2_mupdates = (double)(bn - 2) * (bn - 2) * bench_iters / (v2_t_ms * 1000.0);
-            double v2_gb = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (v2_t_ms * 1.0e6);
-            double v2_speedup = (run_cpu) ? (cpu_t_ms / v2_t_ms) : 1.0;
-            double v2_vs_v1 = (double)v1_t_ms / v2_t_ms;
+            double v2_gb       = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (v2_t_ms * 1.0e6);
+            double v2_speedup  = (run_cpu) ? (cpu_t_ms / v2_t_ms) : 1.0;
+            double v2_vs_v1    = (double)v1_t_ms / v2_t_ms;
 
             printf("%-5d | %-12s | %12.2f | %12.2f | %12.2f | %7.2fx (%5.2fx vs V1)\n",
                    bn, "GPU V2 Opt", (double)v2_t_ms, v2_mupdates, v2_gb, v2_speedup, v2_vs_v1);
 
             // GPU Coalesced (V3)
-            float v3_t_ms = jacobi_gpu_benchmark({bn, bh, 0.0, 0, 0}, db_u, db_u_new, db_f, bench_iters, 2);
+            float v3_t_ms      = jacobi_gpu_benchmark({bn, bh, 0.0, 0, 0}, db_u, db_u_new, db_f, bench_iters, 2);
             double v3_mupdates = (double)(bn - 2) * (bn - 2) * bench_iters / (v3_t_ms * 1000.0);
-            double v3_gb = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (v3_t_ms * 1.0e6);
-            double v3_speedup = (run_cpu) ? (cpu_t_ms / v3_t_ms) : 1.0;
-            double v3_vs_v2 = (double)v2_t_ms / v3_t_ms;
+            double v3_gb       = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (v3_t_ms * 1.0e6);
+            double v3_speedup  = (run_cpu) ? (cpu_t_ms / v3_t_ms) : 1.0;
+            double v3_vs_v2    = (double)v2_t_ms / v3_t_ms;
 
             printf("%-5d | %-12s | %12.2f | %12.2f | %12.2f | %7.2fx (%5.2fx vs V2)\n",
                    bn, "GPU V3 Coal", (double)v3_t_ms, v3_mupdates, v3_gb, v3_speedup, v3_vs_v2);
