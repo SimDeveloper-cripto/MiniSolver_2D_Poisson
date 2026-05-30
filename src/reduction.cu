@@ -60,11 +60,15 @@ __global__ void reduce_max_kernel(
 
     // ── Grid-stride load: each thread handles two consecutive elements
     // This halves the number of blocks needed and keeps threads busy longer.
-    int i = (int)(blockIdx.x * (blockDim.x * 2) + tid);
-    double myMax = -DBL_MAX;
+    int i              = (int)(blockIdx.x * (blockDim.x * 2) + tid);
+    const int gridSize = (int)(blockDim.x * gridDim.x * 2);
+    double myMax       = -DBL_MAX;
 
-    if (i < n) myMax = input[i];
-    if (i + blockDim.x < n) myMax = fmax(myMax, input[i + blockDim.x]);
+    while (i < n) {
+        myMax = fmax(myMax, input[i]);
+        if (i + blockDim.x < n) myMax = fmax(myMax, input[i + blockDim.x]);
+        i += gridSize;
+    }
 
     sdata[tid] = myMax;
     __syncthreads();
