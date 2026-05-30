@@ -15,9 +15,12 @@ struct FullSolverResults {
     double v2_analytical_err;
     double v3_analytical_err;
 
-    double v1_vs_cpu_diff;
-    double v2_vs_cpu_diff;
-    double v3_vs_cpu_diff;
+    double v1_vs_cpu_max_diff;
+    double v1_vs_cpu_rms;
+    double v2_vs_cpu_max_diff;
+    double v2_vs_cpu_rms;
+    double v3_vs_cpu_max_diff;
+    double v3_vs_cpu_rms;
 };
 
 // Aligns the grid size N to be a multiple of block tile size (TILE_X, TILE_Y)
