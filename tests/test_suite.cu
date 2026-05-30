@@ -50,7 +50,13 @@ bool test_solvers_accuracy() {
     const double tol = 1e-6;
     const double h   = 1.0 / (N - 1);
 
-    SolverParams params       = { N, h, tol, 20000, 100 };
+    SolverParams params;
+    params.N           = N;
+    params.max_iter    = 20000;
+    params.check_every = 100;
+    params.h           = h;
+    params.tol         = tol;
+
     FullSolverResults results = run_full_solve(params, true);
 
     // (should be > 0 and <= max_iter)
