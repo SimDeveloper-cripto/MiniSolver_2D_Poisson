@@ -60,7 +60,13 @@ int main(int argc, char** argv) {
     align_grid_size(N);
 
     double h = 1.0 / (N - 1);
-    SolverParams params = { N, h, tol, max_iter, check_every };
+
+    SolverParams params;
+    params.N           = N;
+    params.max_iter    = max_iter;
+    params.check_every = check_every;
+    params.h           = h;
+    params.tol         = tol;
 
     print_gpu_properties();
 

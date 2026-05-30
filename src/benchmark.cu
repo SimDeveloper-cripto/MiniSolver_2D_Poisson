@@ -82,8 +82,16 @@ void run_scalability_benchmark(const std::vector<int>& sizes, bool run_cpu) {
                    bn, "CPU", cpu_t_ms, cpu_mupdates, cpu_gb, "1.00x (Ref)");
         }
 
+        // GPU Benchmarks configuration
+        SolverParams bench_params;
+        bench_params.N           = bn;
+        bench_params.max_iter    = 0;
+        bench_params.check_every = 0;
+        bench_params.h           = bh;
+        bench_params.tol         = 0.0;
+
         // GPU Naive (V1)
-        float v1_t_ms      = jacobi_gpu_benchmark({bn, bh, 0.0, 0, 0}, db_u, db_u_new, db_f, bench_iters, 0);
+        float v1_t_ms      = jacobi_gpu_benchmark(bench_params, db_u, db_u_new, db_f, bench_iters, 0);
         double v1_mupdates = (double)(bn - 2) * (bn - 2) * bench_iters / (v1_t_ms * 1000.0);
         double v1_gb       = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (v1_t_ms * 1.0e6);
         double v1_speedup  = (run_cpu) ? (cpu_t_ms / v1_t_ms) : 1.0;
@@ -92,7 +100,7 @@ void run_scalability_benchmark(const std::vector<int>& sizes, bool run_cpu) {
                bn, "GPU V1 Naive", (double)v1_t_ms, v1_mupdates, v1_gb, v1_speedup);
 
         // GPU Optimized (V2)
-        float v2_t_ms      = jacobi_gpu_benchmark({bn, bh, 0.0, 0, 0}, db_u, db_u_new, db_f, bench_iters, 1);
+        float v2_t_ms      = jacobi_gpu_benchmark(bench_params, db_u, db_u_new, db_f, bench_iters, 1);
         double v2_mupdates = (double)(bn - 2) * (bn - 2) * bench_iters / (v2_t_ms * 1000.0);
         double v2_gb       = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (v2_t_ms * 1.0e6);
         double v2_speedup  = (run_cpu) ? (cpu_t_ms / v2_t_ms) : 1.0;
@@ -102,7 +110,7 @@ void run_scalability_benchmark(const std::vector<int>& sizes, bool run_cpu) {
                bn, "GPU V2 Opt", (double)v2_t_ms, v2_mupdates, v2_gb, v2_speedup, v2_vs_v1);
 
         // GPU Coalesced (V3)
-        float v3_t_ms      = jacobi_gpu_benchmark({bn, bh, 0.0, 0, 0}, db_u, db_u_new, db_f, bench_iters, 2);
+        float v3_t_ms      = jacobi_gpu_benchmark(bench_params, db_u, db_u_new, db_f, bench_iters, 2);
         double v3_mupdates = (double)(bn - 2) * (bn - 2) * bench_iters / (v3_t_ms * 1000.0);
         double v3_gb       = (3.0 * sizeof(double) * (bn - 2) * (bn - 2) * bench_iters) / (v3_t_ms * 1.0e6);
         double v3_speedup  = (run_cpu) ? (cpu_t_ms / v3_t_ms) : 1.0;

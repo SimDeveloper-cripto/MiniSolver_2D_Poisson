@@ -32,7 +32,6 @@ FullSolverResults run_full_solve(const SolverParams& params, bool run_cpu) {
 
     const int N        = params.N;
     const double h     = params.h;
-    const double tol   = params.tol;
     const size_t bytes = (size_t)N * N * sizeof(double);
 
     // Host memory allocation
