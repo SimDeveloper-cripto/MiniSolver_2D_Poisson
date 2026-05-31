@@ -44,7 +44,7 @@
  * i = blockIdx.y * TILE_Y + ty,
  * j = blockIdx.x* T ILE_X + tx.
  */
-__global__ void jacobi_kernel_naive(
+__global__ void jacobi_kernel_naive (
     double* __restrict__       u_new,
     const double* __restrict__ u,
     const double* __restrict__ f,
@@ -65,7 +65,7 @@ __global__ void jacobi_kernel_naive(
  * @param d_block_max  Output array of length gridDim.x * gridDim.y;
  *                     thread 0 of each block writes the block's max |diff|.
  */
-__global__ void jacobi_kernel_shared(
+__global__ void jacobi_kernel_shared (
     double* __restrict__       u_new,
     const double* __restrict__ u,
     const double* __restrict__ f,
@@ -80,7 +80,7 @@ __global__ void jacobi_kernel_shared(
  * All 256 threads of the block cooperate to load the 324 elements of the SMEM tile
  * (16x16 center + 1-cell halo) in exactly 2 coalesced read phases.
  */
-__global__ void jacobi_kernel_shared_coalesced(
+__global__ void jacobi_kernel_shared_coalesced (
     double* __restrict__       u_new,
     const double* __restrict__ u,
     const double* __restrict__ f,
@@ -88,13 +88,33 @@ __global__ void jacobi_kernel_shared_coalesced(
     double h2,
     double* __restrict__       d_block_max);
 
+
+/**
+ * Vflex – V1 variant with dynamic block-dim indexing for the block-size sweep.
+ *
+ * Identical to V1 in computation.
+ * This allows it to be launched with arbitrary block configurations
+ * {8x8, 16x8, 32x8, 32x16, 32x32, ...}.
+ *
+ * Ref: Volkov, V. (2010). "Better Performance at Lower Occupancy."
+ *      GPU Technology Conference, NVIDIA.
+ */
+__global__ void jacobi_kernel_flex (
+    double* __restrict__       u_new,
+    const double* __restrict__ u,
+    const double* __restrict__ f,
+    int    N,
+    double h2
+);
+
+
 // ── Host-side solver wrappers ─────────────────────────────────────────────────
 
 /**
  * Run V1 on already-allocated, already-initialised device arrays.
  * The caller owns d_u and d_u_new; on return d_u holds the final solution.
  */
-SolverResult jacobi_gpu_naive(
+SolverResult jacobi_gpu_naive (
     SolverParams  params,
     double*       d_u,
     double*       d_u_new,
@@ -104,7 +124,7 @@ SolverResult jacobi_gpu_naive(
  * Run V2 on already-allocated, already-initialised device arrays.
  * The caller owns d_u and d_u_new; on return d_u holds the final solution.
  */
-SolverResult jacobi_gpu_optimized(
+SolverResult jacobi_gpu_optimized (
     SolverParams  params,
     double*       d_u,
     double*       d_u_new,
@@ -114,7 +134,7 @@ SolverResult jacobi_gpu_optimized(
  * Run V3 (coalesced shmem loading) on already-allocated, already-initialised device arrays.
  * The caller owns d_u and d_u_new; on return d_u holds the final solution.
  */
-SolverResult jacobi_gpu_coalesced(
+SolverResult jacobi_gpu_coalesced (
     SolverParams  params,
     double*       d_u,
     double*       d_u_new,
@@ -127,10 +147,27 @@ SolverResult jacobi_gpu_coalesced(
  *
  * @param use_shared 
  */
-float jacobi_gpu_benchmark(
+float jacobi_gpu_benchmark (
     SolverParams  params,
     double*       d_u,
     double*       d_u_new,
     const double* d_f,
     int           bench_iters,
     int           version);    // 0 → V1 kernel; 1 → V2 kernel; 2 → V3 kernel
+
+
+/**
+ * One warmup iteration is performed before the timed loop to prime
+ * instruction cache and avoid cold-start bias.
+ *
+ * Ref: Volkov, V. (2010). "Better Performance at Lower Occupancy." GTC.
+ */
+float jacobi_gpu_benchmark_blocksize (
+    SolverParams  params,
+    double*       d_u,
+    double*       d_u_new,
+    const double* d_f,
+    int           bench_iters,
+    int           bx,
+    int           by
+);

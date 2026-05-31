@@ -79,7 +79,7 @@ __global__ void jacobi_kernel_naive(
     );
 }
 
-__global__ void jacobi_kernel_shared(
+__global__ void jacobi_kernel_shared (
     double* __restrict__       u_new,
     const double* __restrict__ u,
     const double* __restrict__ f,
@@ -196,7 +196,7 @@ __global__ void jacobi_kernel_shared(
     }
 }
 
-__global__ void jacobi_kernel_shared_coalesced(
+__global__ void jacobi_kernel_shared_coalesced (
     double* __restrict__       u_new,
     const double* __restrict__ u,
     const double* __restrict__ f,
@@ -570,5 +570,70 @@ float jacobi_gpu_benchmark(
 
     if (version > 0) CUDA_CHECK(cudaFree(d_block_max));
 
+    return timer.elapsed_ms();
+}
+
+
+__global__ void jacobi_kernel_flex (
+    double* __restrict__       u_new,
+    const double* __restrict__ u,
+    const double* __restrict__ f,
+    int    N,
+    double h2
+) {
+    // Dynamic grid indexing using blockDim (not TILE_X / TILE_Y constants)
+    const int gj = (int)(blockIdx.x * blockDim.x + threadIdx.x);   // column
+    const int gi = (int)(blockIdx.y * blockDim.y + threadIdx.y);   // row
+
+    // Skip boundary and out-of-grid threads
+    if (gi < 1 || gi > N - 2 || gj < 1 || gj > N - 2) return;
+
+    const int    id  = IDX(gi, gj, N);
+    const double val = 0.25 * (
+        u[IDX(gi - 1, gj,     N)] +   // top
+        u[IDX(gi + 1, gj,     N)] +   // bottom
+        u[IDX(gi,     gj - 1, N)] +   // left
+        u[IDX(gi,     gj + 1, N)] +   // right
+        h2 * f[id]
+    );
+    u_new[id] = val;
+    // Note: flex kernel is benchmark-only.
+}
+
+float jacobi_gpu_benchmark_blocksize(
+    SolverParams  params,
+    double*       d_u,
+    double*       d_u_new,
+    const double* d_f,
+    int           bench_iters,
+    int           bx,
+    int           by
+) {
+    const int    N  = params.N;
+    const double h2 = params.h * params.h;
+
+    dim3 block((unsigned int)bx, (unsigned int)by);
+    dim3 grid(
+        (unsigned int)((N + bx - 1) / bx),
+        (unsigned int)((N + by - 1) / by)
+    );
+
+    // Warmup: one iteration to prime L1 / instruction cache
+    jacobi_kernel_flex<<<grid, block>>>(d_u_new, d_u, d_f, N, h2);
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    CudaTimer timer;
+    timer.start();
+
+    for (int it = 0; it < bench_iters; ++it) {
+        jacobi_kernel_flex<<<grid, block>>>(d_u_new, d_u, d_f, N, h2);
+
+        // Double-buffer swap (local pointers only; caller's ptrs are unchanged)
+        double* tmp = d_u_new;
+        d_u_new     = d_u;
+        d_u         = tmp;
+    }
+
+    timer.stop();
     return timer.elapsed_ms();
 }
