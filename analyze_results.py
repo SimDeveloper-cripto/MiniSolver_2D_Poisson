@@ -101,9 +101,9 @@ def parse_csv(lines):
                 })
 
             elif tag in ("block_sweep", "block_sweep_v2", "block_sweep_v3") \
-                    and len(parts) >= 13:
-                # BENCH_CSV,block_sweep,N,bx,by,num_blocks,
-                #           mean_ms,std_ms,gb_s,gflops,speedup_ref16x16,speedup_cpu
+                    and len(parts) >= 12:
+                # BENCH_CSV, block_sweep, N, bx, by, num_blocks,
+                #           mean_ms, std_ms, gb_s, gflops, speedup_ref16x16, speedup_cpu
                 data[tag].append({
                     "N":                int(parts[2]),
                     "bx":               int(parts[3]),

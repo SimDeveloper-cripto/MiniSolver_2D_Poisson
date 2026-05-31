@@ -42,7 +42,7 @@
  *
  * Each thread (tx, ty) processes grid point
  * i = blockIdx.y * TILE_Y + ty,
- * j = blockIdx.x* T ILE_X + tx.
+ * j = blockIdx.x * TILE_X + tx.
  */
 __global__ void jacobi_kernel_naive (
     double* __restrict__       u_new,
@@ -141,7 +141,7 @@ SolverResult jacobi_gpu_coalesced (
     const double* d_f);
 
 /**
- * Tthroughput Benchmark: runs exactly bench_iters iterations of the
+ * Throughput Benchmark: runs exactly bench_iters iterations of the
  * chosen kernel without any convergence check or H ↔ D transfer.
  * Returns milliseconds.
  *

@@ -82,8 +82,8 @@ void run_block_size_sweep(int N, bool csv_output = false);
  * run_weak_scaling_benchmark
  *
  * Weak-scaling study: problem size N grows proportionally to resources.
- * Fix n = TILE_X × TILE_Y = 256 threads/block; sweep b = {1, 4, 16, 64, 256, 1024}
- * so that N = sqrt(n × b) in {16, 32, 64, 128, 256, 512}.
+ * Fix n = TILE_X × TILE_Y = 256 threads/block; sweep b = {4, 16, 64, 256, 1024, 4096}
+ * so that N = sqrt(n × b) in {32, 64, 128, 256, 512, 1024}.
  *
  * Scaled speedup (Lezione 16_0, slide 16):
  *   SS(b, n) = T_seq(1, n*b) / T_versione(b, n*b)
