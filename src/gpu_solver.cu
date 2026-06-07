@@ -158,11 +158,11 @@ __global__ void jacobi_kernel_shared (
 
         // All four reads hit L1/shared memory — no global traffic.
         const double val = 0.25 * (
-            s_u[(si - 1) * SMEM_X + sj ] +   // top
-            s_u[(si + 1) * SMEM_X + sj ] +   // bottom
-            s_u[ si      * SMEM_X + sj - 1] + // left
-            s_u[ si      * SMEM_X + sj + 1] + // right
-            h2 * f[id]                        // f still from global (read once)
+            s_u[(si - 1) * SMEM_X + sj ]    +   // top
+            s_u[(si + 1) * SMEM_X + sj ]    +   // bottom
+            s_u[ si      * SMEM_X + sj - 1] +   // left
+            s_u[ si      * SMEM_X + sj + 1] +   // right
+            h2 * f[id]                          // f still from global (read once)
         );
         u_new[id] = val;
 

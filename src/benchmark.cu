@@ -418,7 +418,9 @@ void run_block_size_sweep(int N, bool csv_output) {
 
     // Sweep all block configs using jacobi_kernel_flex
     for (int ci = 0; ci < n_cfgs; ++ci) {
-        int bx = cfgs[ci].bx, by = cfgs[ci].by;
+        int bx = cfgs[ci].bx;
+        int by = cfgs[ci].by;
+
         int thr     = bx * by;
         int num_blk = ((N + bx - 1) / bx) * ((N + by - 1) / by);
 
